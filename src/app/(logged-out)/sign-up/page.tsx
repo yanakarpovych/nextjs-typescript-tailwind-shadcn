@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { format } from "date-fns";
@@ -105,13 +105,10 @@ const formSchema = z
 export default function SignupPage() {
   const router = useRouter();
 
-  const [dobFromDate, setDobFromDate] = useState<Date | undefined>(undefined);
-
-  useEffect(() => {
-    const date = new Date();
-    date.setFullYear(date.getFullYear() - 120);
-    setDobFromDate(date);
-  }, []);
+  const [dateRange, setDateRange] = useState<{
+    today: Date;
+    earliestDate: Date;
+  } | null>(null);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -130,7 +127,24 @@ export default function SignupPage() {
     router.push("/dashboard");
   };
 
-  const accountType = form.watch("accountType");
+  const accountType = useWatch({
+    control: form.control,
+    name: "accountType",
+  });
+
+  const handleCalendarOpenChange = (open: boolean) => {
+    if (open) {
+      const today = new Date();
+      const earliestDate = new Date(today);
+
+      earliestDate.setFullYear(earliestDate.getFullYear() - 120);
+
+      setDateRange({
+        today,
+        earliestDate,
+      });
+    }
+  };
 
   return (
     <>
@@ -228,7 +242,8 @@ export default function SignupPage() {
                 render={({ field }) => (
                   <FormItem className="flex flex-col pt-2">
                     <FormLabel>Date of birth</FormLabel>
-                    <Popover>
+
+                    <Popover onOpenChange={handleCalendarOpenChange}>
                       <PopoverTrigger asChild>
                         <FormControl>
                           <Button
@@ -246,28 +261,27 @@ export default function SignupPage() {
                       </PopoverTrigger>
 
                       <PopoverContent align="start" className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          defaultMonth={field.value}
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          fixedWeeks
-                          weekStartsOn={1}
-                          startMonth={dobFromDate}
-                          captionLayout="dropdown"
-                          disabled={
-                            dobFromDate
-                              ? [
-                                  {
-                                    after: new Date(),
-                                    before: dobFromDate,
-                                  },
-                                ]
-                              : undefined
-                          }
-                        />
+                        {dateRange && (
+                          <Calendar
+                            mode="single"
+                            defaultMonth={field.value}
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            fixedWeeks
+                            weekStartsOn={1}
+                            startMonth={dateRange.earliestDate}
+                            captionLayout="dropdown"
+                            disabled={[
+                              {
+                                after: dateRange.today,
+                                before: dateRange.earliestDate,
+                              },
+                            ]}
+                          />
+                        )}
                       </PopoverContent>
                     </Popover>
+
                     <FormMessage />
                   </FormItem>
                 )}
